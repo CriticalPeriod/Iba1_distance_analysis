@@ -1,10 +1,4 @@
-/*
- * Find PNN cells (PNN) and PV coloc
- * compute nuclear foci in PNN/PV cells
- * Author Philippe Mailly
- */
-
-import GFP_PV_PNN_Tools.Cells_PV;
+import GFP_PV_PNN_Tools.Cell;
 import GFP_PV_PNN_Tools.Tools;
 import ij.*;
 import ij.plugin.PlugIn;
@@ -31,159 +25,160 @@ import org.apache.commons.io.FilenameUtils;
 import org.scijava.util.ArrayUtils;
 
 
-
+/**
+ * Detect DAPI nuclei, PV cells and PNN cells
+ * Compute their colocalization
+ * Detect DAPI and Gamma-H2AX foci in PNN/PV cells
+ * @author Orion-CIRB
+ */
 public class GFP_PV_PNN implements PlugIn {
     
     Tools tools = new Tools();
     
     private String imageDir = "";
     public String outDirResults = "";
-    private boolean canceled = false;
-    public String file_ext = "czi";
-    public BufferedWriter global_results_analyze;
-    public BufferedWriter cells_results_analyze;
+    public BufferedWriter results;
    
     
-    /**
-     * 
-     * @param arg
-     */
-    @Override
     public void run(String arg) {
         try {
+            if ((!tools.checkInstalledModules()) || (!tools.checkStarDistModels())) {
+                return;
+            } 
+            
             imageDir = IJ.getDirectory("Choose directory containing image files...");
             if (imageDir == null) {
                 return;
             }   
             // Find images with extension
-            file_ext = tools.findImageType(new File(imageDir));
-            ArrayList<String> imageFiles = tools.findImages(imageDir, file_ext);
+            String fileExt = tools.findImageType(new File(imageDir));
+            ArrayList<String> imageFiles = tools.findImages(imageDir, fileExt);
             if (imageFiles == null) {
-                IJ.showMessage("Error", "No images found with "+file_ext+" extension");
+                IJ.showMessage("Error", "No images found with " + fileExt + " extension");
                 return;
             }
-            // create output folder
-            outDirResults = imageDir + File.separator+ "Results"+ File.separator;
+            
+            // Create output folder
+            outDirResults = imageDir + File.separator+ "Results" + File.separator;
             File outDir = new File(outDirResults);
             if (!Files.exists(Paths.get(outDirResults))) {
                 outDir.mkdir();
             }
+            // Write header in results file
+            String header = "Image name\tCell label\tDAPI background\tNucleus vol (µm3)\tNucleus total int\t"
+                    + "Nucleus total int corrected\tNucleus total Gamma-H2AX int\tNucleus total Gamma-H2AX int corrected\t" +
+                    "PV background\tPV cell vol (µm3)\tPV cell total int\tPV cell total int corrected\t" +
+                    "PNN background\tPNN cell vol (µm3)\tPNN cell total int\tPNN cell total int corrected\t" +
+                    "Nb Gamma-H2AX foci\tGamma-H2AX foci total vol (µm3)\tGamma-H2AX foci total int\t" +
+                    "Nb DAPI foci\tDAPI foci total vol (µm3)\tDAPI foci total int\n";
+            FileWriter fwResults = new FileWriter(outDirResults + "results.xls", false);
+            results = new BufferedWriter(fwResults);
+            results.write(header);
+            results.flush();
             
-            // create OME-XML metadata store of the latest schema version
+            // Create OME-XML metadata store of the latest schema version
             ServiceFactory factory;
             factory = new ServiceFactory();
             OMEXMLService service = factory.getInstance(OMEXMLService.class);
             IMetadata meta = service.createOMEXMLMetadata();
             ImageProcessorReader reader = new ImageProcessorReader();
             reader.setMetadataStore(meta);
-            // Find channel names , calibration
             reader.setId(imageFiles.get(0));
+            
+            // Find image calibration
             tools.cal = tools.findImageCalib(meta);
+            
+            // Find channel names
             String[] chsName = tools.findChannels(imageFiles.get(0), meta, reader);
             
-            
             // Channels dialog
-            
             String[] channels = tools.dialog(chsName);
-            if ( channels == null || tools.canceled) {
-                IJ.showStatus("Plugin cancelled");
+            if (channels == null) {
+                IJ.showStatus("Plugin canceled");
                 return;
             }
-            // Write header
-            
-            String header = "Image Name\t#PV Cell\tPV Vol\tPV BG Int\tPV Int\tGFP BG Int\tPV Int in GFP\t#Foci GFP PV cell\tFoci GFP Vol PV cell\t"
-                    + "Foci GFP Int PV cell\tDAPI BG Int\tPV Int in DAPI\t#Foci DAPI PV cell\tFoci DAPI Vol PV cell\tFoci DAPI Int PV cell\tPV is PNN\t"
-                    + "#PNN Cell\tPNN Vol\tPNN BG Int\tPNN Int\tPNN Int in GFP\t#Foci GFP PNN cell\tFoci GFP Vol PNN cell\tFoci GFP Int PNN cell\t"
-                    + "PNN Int in DAPI\t#Foci DAPI PNN cell\tFoci DAPI Vol PNN cell\tFoci DAPI Int PNN cell\n";
-            FileWriter fwCells = new FileWriter(outDirResults + "GFP_PV_PNN-Cells_Results.xls", false);
-            cells_results_analyze = new BufferedWriter(fwCells);
-            cells_results_analyze.write(header);
-            cells_results_analyze.flush();
-            
+
             for (String f : imageFiles) {
-                reader.setId(f);
                 String rootName = FilenameUtils.getBaseName(f);
+                tools.print("--- ANALYZING IMAGE " + rootName + " ------");
+                reader.setId(f);
+                
                 ImporterOptions options = new ImporterOptions();
                 options.setId(f);
                 options.setSplitChannels(true);
                 options.setQuiet(true);
                 options.setColorMode(ImporterOptions.COLOR_MODE_GRAYSCALE);
-                 
-                ArrayList<Cells_PV> pvCellsList = new ArrayList();
-                // open PV Channel
-                System.out.println("--- Opening PV channel  ...");
-                int indexCh = ArrayUtils.indexOf(chsName,channels[0]);
-                ImagePlus imgPV = BF.openImagePlus(options)[indexCh];
-                
-                // Find PV cells with cellpose
-                Objects3DIntPopulation pvPop = tools.cellPoseCellsPop(imgPV, "PV");
-                int pvCells = pvPop.getNbObjects();
-                System.out.println(pvCells +" PV cells found");
-                
-                // Add parameters
-                tools.pvCellsParameters (pvPop, pvCellsList, imgPV, "PV");
-                tools.flush_close(imgPV);
-                
-                // open PNN Channel
-                System.out.println("--- Opening PNN channel  ...");
-                indexCh = ArrayUtils.indexOf(chsName,channels[1]);
-                ImagePlus imgPNN = BF.openImagePlus(options)[indexCh];
-                
-                // Find PNN cells with cellpose
-                Objects3DIntPopulation pnnPop = tools.cellPoseCellsPop(imgPNN, "PNN");
-                int pnnCells = pnnPop.getNbObjects();
-                System.out.println(pnnCells +" PNN cells found");
-                
-                // Add parameters
-                tools.pvCellsParameters (pnnPop, pvCellsList, imgPNN, "PNN");
-                
-                // Find PV coloc with PNN cells
-                tools.findColocCells(pvPop, pnnPop, pvCellsList);
-                tools.flush_close(imgPNN);
-               
-                // Finding foci GFP in PV cells
-                System.out.println("--- Opening GFP channel  ...");
-                indexCh = ArrayUtils.indexOf(chsName,channels[2]);
-                ImagePlus imgGfpFoci = BF.openImagePlus(options)[indexCh];
-                
-                // pv GFP Foci
-                Objects3DIntPopulation pvFociGfpPop = tools.stardistFociInCellsPop(imgGfpFoci, pvPop, "PV", "GFP", pvCellsList);
-                                                
-                // pnn GFP Foci
-                Objects3DIntPopulation pnnFociGfpPop = tools.stardistFociInCellsPop(imgGfpFoci, pnnPop, "PNN", "GFP", pvCellsList);
-                tools.flush_close(imgGfpFoci);
                 
                 // Open DAPI channel
-                System.out.println("--- Opening DAPI channel  ...");
-                indexCh = ArrayUtils.indexOf(chsName,channels[3]);
-                ImagePlus imgDapiFoci = BF.openImagePlus(options)[indexCh];
+                tools.print("- Analyzing PV channel -");
+                int indexCh = ArrayUtils.indexOf(chsName, channels[3]);
+                ImagePlus imgDAPI = BF.openImagePlus(options)[indexCh];
+                // Detect DAPI nuclei with CellPose
+                System.out.println("Finding DAPI nuclei...");
+                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, true, tools.cellposeNucleiModel, 1, tools.cellposeNucleiDiameter, tools.cellposeNucleiCellThresh, 0.75, true, tools.minNucleusVol, tools.maxNucleusVol);
+                System.out.println(dapiPop.getNbObjects() + " DAPI nuclei found");
+                
+                // Open PV channel
+                tools.print("- Analyzing PV channel -");
+                indexCh = ArrayUtils.indexOf(chsName, channels[0]);
+                ImagePlus imgPV = BF.openImagePlus(options)[indexCh];
+                // Detect PV cells with CellPose
+                System.out.println("Finding PV cells....");
+                Objects3DIntPopulation pvPop = tools.cellposeDetection(imgPV, true, tools.cellposePVModel, 1, tools.cellposePVDiameter, tools.cellposePVCellThresh, 0.25, false, tools.minCellVol, tools.maxCellVol);
+                System.out.println(pvPop.getNbObjects() + " PV cells found");
+                
+                // Open PNN channel
+                tools.print("- Analyzing PNN channel -");
+                indexCh = ArrayUtils.indexOf(chsName, channels[1]);
+                ImagePlus imgPNN = BF.openImagePlus(options)[indexCh];
+                // Detect PNN cells with CellPose
+                System.out.println("Finding PNN cells....");
+                Objects3DIntPopulation pnnPop = tools.cellposeDetection(imgPNN, true, tools.cellposePNNModel, 1, tools.cellposePNNDiameter, tools.cellposePNNCellThresh, 0.25, false, tools.minCellVol, tools.maxCellVol);
+                System.out.println(pnnPop.getNbObjects() + " PNN cells found");
+                
+                // Open GFP channel
+                tools.print("- Analyzing GFP channel -");
+                indexCh = ArrayUtils.indexOf(chsName, channels[2]);
+                ImagePlus imgGFP = BF.openImagePlus(options)[indexCh];
+                
+                System.out.println("Colocalizing nuclei with PV and PNN cells....");
+                ArrayList<Cell> cells = tools.colocalization(dapiPop, pvPop, pnnPop);
+                System.out.println(cells.size() + " nuclei colocalized with a PV and/or a PNN cell");
+                
+                tools.print("- Measuring cells parameters -");
+                tools.writeCellsParameters(cells, imgDAPI, imgPV, imgPNN, imgGFP);
                
-                // pv DAPI Foci
-                Objects3DIntPopulation pvFociDapiPop = tools.stardistFociInCellsPop(imgDapiFoci, pvPop, "PV", "DAPI", pvCellsList);
+                // Detect GFP foci in nuclei
+                System.out.println("Finding GFP foci in each nucleus....");
+                Objects3DIntPopulation gfpFociPop = tools.stardistFociInCellsPop(imgGFP, cells, "GFP", true);
                 
-                // pnn DAPI Foci
-                Objects3DIntPopulation pnnFociDapiPop = tools.stardistFociInCellsPop(imgDapiFoci, pnnPop, "PNN", "DAPI", pvCellsList);
-                
+                // Detect DAPI foci in nuclei
+                System.out.println("Finding DAPI foci in each nucleus....");
+                Objects3DIntPopulation dapiFociPop = tools.stardistFociInCellsPop(imgDAPI, cells, "DAPI", true);
                 
                 // Save image objects
-                tools.saveImgObjects(pvPop, pvFociGfpPop, pvFociDapiPop, pnnPop,  pnnFociGfpPop, pnnFociDapiPop, rootName, imgDapiFoci, outDirResults);
-                tools.flush_close(imgDapiFoci);
-
-                // write cells data
-                for (Cells_PV pvCell : pvCellsList) {
-                    cells_results_analyze.write(rootName+"\t"+pvCell.getPvCellLabel()+"\t"+pvCell.getPvCellVol()+"\t"+pvCell.getPvBgMeanInt()+"\t"+
-                    pvCell.getPvCellMeanInt()+"\t"+pvCell.getGFPBgMeanInt()+"\t"+pvCell.getPvCellGFPMeanInt()+"\t"+pvCell.getPvNbGFPFoci()+"\t"+
-                    pvCell.getPvGFPFociVol()+"\t"+pvCell.getPvGFPFociMeanInt()+"\t"+pvCell.getDapiBgMeanInt()+"\t"+pvCell.getPvCellDapiMeanInt()+"\t"+
-                    pvCell.getPvNbDapiFoci()+"\t"+pvCell.getPvDapiFociVol()+"\t"+pvCell.getPvFociDapiMeanInt()+"\t"+pvCell.getPvIsPNN()+"\t"+
-                    pvCell.getPnnCellLabel()+"\t"+pvCell.getPnnCellVol()+"\t"+pvCell.getPnnBgMeanInt()+"\t"+pvCell.getPnnCellMeanInt()+"\t"+pvCell.getPnnCellGFPMeanInt()+"\t"+
-                    pvCell.getPnnNbGFPFoci()+"\t"+pvCell.getPnnGFPFociVol()+"\t"+pvCell.getPnnGFPFociMeanInt()+"\t"+pvCell.getPnnCellDapiInt()+"\t"+
-                    pvCell.getPnnNbDapiFoci()+"\t"+pvCell.getPnnDapiFociVol()+"\t"+pvCell.getPnnDapiFociMeanInt()+"\n");
-                    cells_results_analyze.flush();
+                tools.print("- Saving results -");
+                tools.drawResults(imgDAPI, imgPV, cells, gfpFociPop, dapiFociPop, rootName, outDirResults);
+                
+                // Write results
+                for (Cell cell : cells) {
+                    results.write(rootName+"\t"+cell.params.get("label")+"\t"+cell.params.get("dapiBg")+"\t"+cell.params.get("nucVol")+"\t"+cell.params.get("nucIntTot")+
+                                  "\t"+cell.params.get("nucIntTotCorr")+"\t"+cell.params.get("nucGfpIntTot")+"\t"+cell.params.get("nucGfpIntTotCorr")+
+                                  "\t"+cell.params.get("pvBg")+"\t"+cell.params.get("pvCellVol")+"\t"+cell.params.get("pvCellIntTot")+"\t"+cell.params.get("pvCellIntTotCorr")+
+                                  "\t"+cell.params.get("pnnBg")+"\t"+cell.params.get("pnnCellVol")+"\t"+cell.params.get("pnnCellIntTot")+"\t"+cell.params.get("pnnCellIntTotCorr")+
+                                  "\t"+cell.params.get("gfpFociNb")+"\t"+cell.params.get("gfpFociVolTot")+"\t"+cell.params.get("gfpFociIntTot")+
+                                  "\t"+cell.params.get("dapiFociNb")+"\t"+cell.params.get("dapiFociVolTot")+"\t"+cell.params.get("dapiFociIntTot")+"\n");
+                    results.flush();
                 }
+                
+                tools.flush_close(imgDAPI);
+                tools.flush_close(imgPNN);
+                tools.flush_close(imgPV);
+                tools.flush_close(imgGFP);
             }
         } catch (IOException | DependencyException | ServiceException | FormatException | io.scif.DependencyException  ex) {
             Logger.getLogger(GFP_PV_PNN.class.getName()).log(Level.SEVERE, null, ex);
         }
-        IJ.showStatus("Process done");
+        tools.print("--- Process done ---");
     }    
 }    
