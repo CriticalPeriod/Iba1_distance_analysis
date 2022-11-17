@@ -42,11 +42,12 @@ public class Cell {
         params.put("label", label);
     }
     
-    public void setNucParams(double dapiBg, double nucVol, double nucIntTot, double nucIntTotCorr, double nucGfpIntTot, double nucGfpIntTotCorr) {
+    public void setNucParams(double dapiBg, double nucVol, double nucIntTot, double nucIntTotCorr, double gfpBg, double nucGfpIntTot, double nucGfpIntTotCorr) {
         params.put("dapiBg", dapiBg);
         params.put("nucVol", nucVol);
         params.put("nucIntTot", nucIntTot);
         params.put("nucIntTotCorr", nucIntTotCorr);
+        params.put("gfpBg", gfpBg);
         params.put("nucGfpIntTot", nucGfpIntTot);
         params.put("nucGfpIntTotCorr", nucGfpIntTotCorr);
     }
@@ -67,22 +68,24 @@ public class Cell {
         this.pnnCell = pnnCell;
     }
     
-    public void setPnnParams(double pnnBg, Double pnnCellVol, Double pnnCellIntTot, Double pnnCellIntCorrTot) {
+    public void setPnnParams(double pnnBg, Double pnnCellVol, Double pnnCellIntTot, Double pnnCellIntTotCorr) {
         params.put("pnnBg", pnnBg);
         params.put("pnnCellVol", pnnCellVol);
         params.put("pnnCellIntTot", pnnCellIntTot);
-        params.put("pnnCellIntCorrTot", pnnCellIntCorrTot);     
+        params.put("pnnCellIntTotCorr", pnnCellIntTotCorr);   
     }
     
-    public void setDapiFociParams(double dapiFociNb, double dapiFociVolTot, double dapiFociIntTot) {
+    public void setDapiFociParams(double dapiFociNb, double dapiFociVolTot, double dapiFociIntTot, double dapiFociIntTotCorr) {
         params.put("dapiFociNb", dapiFociNb);
         params.put("dapiFociVolTot", dapiFociVolTot);
-        params.put("dapiFociIntTot", dapiFociIntTot); 
+        params.put("dapiFociIntTot", dapiFociIntTot);
+        params.put("dapiFociIntTotCorr", dapiFociIntTotCorr);
     }
     
-    public void setGfpFociParams(double gfpFociNb, double gfpFociVolTot, double gfpFociIntTot) {
+    public void setGfpFociParams(double gfpFociNb, double gfpFociVolTot, double gfpFociIntTot, double gfpFociIntTotCorr) {
         params.put("gfpFociNb", gfpFociNb);
         params.put("gfpFociVolTot", gfpFociVolTot);
-        params.put("gfpFociIntTot", gfpFociIntTot); 
+        params.put("gfpFociIntTot", gfpFociIntTot);
+        params.put("gfpFociIntTotCorr", gfpFociIntTotCorr);
     }
 }

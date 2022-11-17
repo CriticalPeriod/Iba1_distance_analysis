@@ -15,6 +15,7 @@ import org.scijava.command.CommandModule;
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.gui.WaitForUserDialog;
 import ij.plugin.Concatenator;
 import java.io.PrintStream;
 import mcib3d.geom2.tracking.TrackingAssociation;
@@ -279,8 +280,8 @@ public class StarDist2D extends StarDist2DBase implements Command {
     public ImagePlus associateLabels() {
         ImagePlus labImg = getLabelImagePlus();
         // put the image back in slices
-        if ( labImg.getNChannels()>1) labImg.setDimensions(1, labImg.getNChannels(), 1);
-        if ( labImg.getNFrames()>1) labImg.setDimensions(1, labImg.getNFrames(), 1);
+        if (labImg.getNChannels()>1) labImg.setDimensions(1, labImg.getNChannels(), 1);
+        if (labImg.getNFrames()>1) labImg.setDimensions(1, labImg.getNFrames(), 1);
         // do association
         ImagePlus[] associated = new ImagePlus[labImg.getNSlices()];
         associated[0] = labImg.crop(1+"-"+1);
@@ -296,8 +297,6 @@ public class StarDist2D extends StarDist2DBase implements Command {
         hyperRes.setDimensions(1, hyperRes.getNFrames(), 1);
         labImg.changes = false;
         labImg.close();
-        //hyperRes.show();
-        //new WaitForUserDialog("asso").show();
         return hyperRes;
     }
     

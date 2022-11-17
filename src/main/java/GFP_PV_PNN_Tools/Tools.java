@@ -51,38 +51,40 @@ public class Tools {
     public String[] channelNames = {"PV", "PNN", "Gamma-H2AX", "DAPI"};
     public Calibration cal;
     public double pixVol= 0;
-    public double minNucleusVol = 100;
-    public double maxNucleusVol = 1000;
-    public double minCellVol = 150;
-    public double maxCellVol = 2000;
-    public double minFociVol = 0;//0.1;
-    public double maxFociVol = 100;//5;
-    
-    // StarDist
-    private File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
-    private String stardistFociModel = "pmls2.zip";
-    private Object syncObject = new Object();
-    private final double stardistPercentileBottom = 0.2;
-    private final double stardistPercentileTop = 99.8;
-    private final double stardistFociProbThresh = 0.25;
-    private final double stardistFociOverlayThresh = 0.25;
-    private String stardistOutput = "Label Image";
-    
-     // Cellpose
-    private String cellposeEnvDirPath = "/opt/miniconda3/envs/cellpose";
-    public String cellposeNucleiModel = "cyto2";
-    public int cellposeNucleiDiameter = 60;
-    public int cellposeNucleiCellThresh = 0;
-    public String cellposePVModel = "cyto";
-    public int cellposePVDiameter = 100;
-    public int cellposePVCellThresh = 1;
-    public String cellposePNNModel = "livecell";
-    public int cellposePNNDiameter = 100;
-    public int cellposePNNCellThresh = -3;
-    private boolean useGpu = true;
     
     private CLIJ2 clij2 = CLIJ2.getInstance();
     
+    // Nuclei and cells detection with Cellpose
+    private String cellposeEnvDirPath = "/opt/miniconda3/envs/cellpose";
+    private boolean useGpu = true;
+    public String cellposeNucleiModel = "cyto2";
+    public int cellposeNucleiDiameter = 30;
+    public int cellposeNucleiCellThresh = 0;
+    public double cellposeNucleiStitchThresh = 0.75;
+    public double minNucleusVol = 100;
+    public double maxNucleusVol = 1000;
+            
+    public String cellposePVModel = "cyto_PV1";
+    public String cellposePNNModel = "livecell_PNN1";
+    public int cellposeCellThresh = 0;
+    public int cellposeCellDiameter = 50;
+    public double cellposeCellStitchThresh = 0.25;
+    public double minCellVol = 100;
+    public double maxCellVol = 2000;
+    public double nucleusPVColocThresh = 0.5;
+    public double nucleusPNNColocThresh = 0.25;
+    
+    // Foci detection with StarDist
+    private File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
+    private String stardistFociModel = "pmls2.zip";
+    private Object syncObject = new Object();
+    private String stardistOutput = "Label Image";
+    private double stardistPercentileBottom = 0.2;
+    private double stardistPercentileTop = 99.8;
+    private double stardistFociProbThresh = 0.50;
+    private double stardistFociOverlayThresh = 0.25;
+    public double minFociVol = 0.1;
+    public double maxFociVol = 50;
     
     
     /**
@@ -264,16 +266,21 @@ public class Tools {
             index++;
         }
         
-        gd.addMessage("Cells detection", Font.getFont("Monospace"), Color.blue);
+        gd.addMessage("Nuclei detection", Font.getFont("Monospace"), Color.blue);
         if (IJ.isWindows())
             cellposeEnvDirPath = System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose";
         gd.addDirectoryField("Cellpose environment path: ", cellposeEnvDirPath);
+        gd.addNumericField("Min nucleus volume (µm3): ", minNucleusVol);
+        gd.addNumericField("Max nucleus volume (µm3): ", maxNucleusVol);
+    
+        gd.addMessage("Cells detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min cell volume (µm3): ", minCellVol);
         gd.addNumericField("Max cell volume (µm3): ", maxCellVol);
         
         gd.addMessage("Foci detection", Font.getFont("Monospace"), Color.blue);
+        gd.addNumericField("StarDist probability threshold", stardistFociProbThresh);
         gd.addNumericField("Min foci volume (µm3): ", minFociVol);
-        gd.addNumericField("max foci volume (µm3: ", maxFociVol);
+        gd.addNumericField("Max foci volume (µm3): ", maxFociVol);
         
         gd.addMessage("Image calibration", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("XY pixel size (µm): ", cal.pixelWidth);
@@ -287,8 +294,11 @@ public class Tools {
             chChoices = null;
         
         cellposeEnvDirPath = gd.getNextString();
+        minNucleusVol = gd.getNextNumber();
+        maxNucleusVol = gd.getNextNumber();
         minCellVol = gd.getNextNumber();
         maxCellVol = gd.getNextNumber();
+        stardistFociProbThresh = gd.getNextNumber();
         minFociVol = gd.getNextNumber();
         maxFociVol = gd.getNextNumber();
         cal.pixelWidth = cal.pixelHeight = gd.getNextNumber();
@@ -307,7 +317,7 @@ public class Tools {
     public Objects3DIntPopulation cellposeDetection(ImagePlus img, boolean resize, String cellposeModel, int channel, int diameter, double cellProbThresh, double stitchThreshold, boolean removeOutliers, double volMin, double volMax) throws IOException{
         ImagePlus imgResized;
         if (resize) {
-            float resizeFactor = 0.5f;
+            float resizeFactor = 0.25f;
             imgResized = img.resize((int)(img.getWidth()*resizeFactor), (int)(img.getHeight()*resizeFactor), 1, "none");
         } else {
             imgResized = new Duplicator().run(img);
@@ -370,7 +380,7 @@ public class Tools {
     /**
      * Find cells colocalizing with a nucleus
      */
-    public ArrayList<Cell> colocalization(Objects3DIntPopulation nucleiPop, Objects3DIntPopulation cellPop1, Objects3DIntPopulation cellPop2) {
+    public ArrayList<Cell> colocalization(Objects3DIntPopulation nucleiPop, Objects3DIntPopulation cellPop1, Objects3DIntPopulation cellPop2, double colocThresh1, double colocThresh2) {
         ArrayList<Cell> cells = new ArrayList<Cell>();
         if (nucleiPop.getNbObjects() > 0) {
             MeasurePopulationColocalisation coloc1 = new MeasurePopulationColocalisation(nucleiPop, cellPop1);
@@ -380,11 +390,12 @@ public class Tools {
             for (Object3DInt nucleus: nucleiPop.getObjects3DInt()) {
                 Cell cell = new Cell(nucleus);
                 boolean coloc = false;
-                
+             
                 for (Object3DInt c1: cellPop1.getObjects3DInt()) {
                     double colocVal = coloc1.getValueObjectsPair(nucleus, c1);
-                    if (colocVal > 0.25*nucleus.size()) {
+                    if (colocVal > colocThresh1*nucleus.size()) {
                         cell.setPvCell(c1);
+                        cellPop1.removeObject(c1);
                         coloc = true;
                         break;
                     }
@@ -392,8 +403,9 @@ public class Tools {
                 
                 for (Object3DInt c2: cellPop2.getObjects3DInt()) {
                     double colocVal = coloc2.getValueObjectsPair(nucleus, c2);
-                    if (colocVal > 0.25*nucleus.size()) {
+                    if (colocVal > colocThresh2*nucleus.size()) {
                         cell.setPnnCell(c2);
+                        cellPop2.removeObject(c2);
                         coloc = true;
                         break;
                     }
@@ -428,12 +440,12 @@ public class Tools {
             double nucVol = new MeasureVolume(nucleus).getVolumeUnit();
             double nucIntTot = new MeasureIntensity(nucleus, ImageHandler.wrap(imgDAPI)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
             double nucGFPIntTot = new MeasureIntensity(nucleus, ImageHandler.wrap(imgGFP)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-            cell.setNucParams(dapiBg, nucVol, nucIntTot, nucIntTot-dapiBg*nucVol, nucGFPIntTot, nucGFPIntTot-gfpBg*nucVol);
+            cell.setNucParams(dapiBg, nucVol, nucIntTot, nucIntTot-dapiBg*nucVol, gfpBg, nucGFPIntTot, nucGFPIntTot-gfpBg*nucVol);
 
             // PV cell
             Object3DInt pvCell = cell.getPvCell();
-            nucleus.setLabel(label);
             if(pvCell != null) {
+                pvCell.setLabel(label);
                 double pvCellVol = new MeasureVolume(pvCell).getVolumeUnit();
                 double pvCellIntTot = new MeasureIntensity(pvCell, ImageHandler.wrap(imgPV)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
                 cell.setPvParams(pvBg, pvCellVol, pvCellIntTot, pvCellIntTot-pvBg*pvCellVol);
@@ -443,8 +455,8 @@ public class Tools {
             
             // PNN cell
             Object3DInt pnnCell = cell.getPnnCell();
-            nucleus.setLabel(label);
             if(pnnCell != null) {
+                pnnCell.setLabel(label);
                 double pnnCellVol = new MeasureVolume(pnnCell).getVolumeUnit();
                 double pnnCellIntTot = new MeasureIntensity(pnnCell, ImageHandler.wrap(imgPNN)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
                 cell.setPnnParams(pnnBg, pnnCellVol, pnnCellIntTot, pnnCellIntTot-pnnBg*pnnCellVol);
@@ -520,7 +532,8 @@ public class Tools {
 
             // Label foci in 3D
             ImagePlus imgLabels = star.associateLabels();
-            if (resize) imgLabels.resize(imgNuc.getWidth(), imgNuc.getHeight(), 1, "none"); 
+            if (resize) imgLabels = imgLabels.resize(imgNuc.getWidth(), imgNuc.getHeight(), 1, "none");
+            
             flush_close(imgNuc);
             imgLabels.setCalibration(cal);
             Objects3DIntPopulation fociPop = new Objects3DIntPopulation(ImageHandler.wrap(imgLabels));
@@ -596,10 +609,10 @@ public class Tools {
         
         switch (fociType) {
             case "DAPI" :
-                cell.setDapiFociParams(fociNb, fociVol, fociInt);
+                cell.setDapiFociParams(fociNb, fociVol, fociInt, fociInt-cell.params.get("dapiBg")*fociVol);
                 break;
             case "GFP" :
-                cell.setGfpFociParams(fociNb, fociVol, fociInt);
+                cell.setGfpFociParams(fociNb, fociVol, fociInt, fociInt-cell.params.get("gfpBg")*fociVol);
                 break;
         }
     }
@@ -611,13 +624,10 @@ public class Tools {
      * @param fontSize 
      */
     public void labelObject(Object3DInt obj, ImagePlus img, int fontSize) {
-        if (IJ.isMacOSX())
-            fontSize *= 3;
-        
         BoundingBox bb = obj.getBoundingBox();
-        int z = bb.zmin; //(int)(bb.zmin + 0.5*(bb.zmax - bb.zmin));
-        int x = bb.xmin; //(int)(bb.xmin + 0.5*(bb.xmax - bb.xmin));
-        int y = bb.ymin;  //(int)(bb.ymin + 0.5*(bb.ymax - bb.ymin));
+        int z = bb.zmin;
+        int x = bb.xmin;
+        int y = bb.ymin;
         img.setSlice(z+1);
         ImageProcessor ip = img.getProcessor();
         ip.setFont(new Font("SansSerif", Font.PLAIN, fontSize));
@@ -637,7 +647,7 @@ public class Tools {
         ImageHandler imgObj2 = imgObj1.createSameDimensions();
         ImageHandler imgObj3 = imgObj1.createSameDimensions();
         
-        for(Cell cell: cells) {            
+        for(Cell cell: cells) {
             boolean isPV = false;
             if (cell.getPvCell() != null) {
                 cell.getPvCell().drawObject(imgObj1);
