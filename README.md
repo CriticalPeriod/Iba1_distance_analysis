@@ -9,17 +9,18 @@
 
 ### Images description
 
-3D images taken with a x20 objective
+3D images taken with a x60 objective
 
-3 channels:
-  1. *CSU_405:* DAPI nuclei
-  2. *CSU_488:* Th cells 
-  3. *CSU_561:* ORF1p
+4 channels:
+  1. *Alexa Fluor 647:* PV
+  2. *Alexa Fluor 546:* PNN
+  3. *EGFP:* Gamma-H2AX
+  4. *Hoechst 33342:* nuclei
 
 ### Plugin description
 
-* Detect DAPI nuclei with Cellpose
-* Detect Th cells with Cellpose
+* Detect nuclei, PV and PNN cells with Cellpose
+
 * Keep Th cells colocalizing with a nucleus only
 * Measure ORF1p intensity in the nucleus and the cytoplasm of each Th cell
 * Measure ORF1p intensity in Th-negative nuclei
