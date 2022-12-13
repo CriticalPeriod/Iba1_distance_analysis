@@ -29,9 +29,9 @@
 * **3DImageSuite** Fiji plugin
 * **CLIJ** Fiji plugin
 * **Cellpose** conda environment + *cyto2*, *cyto_PV1* (homemade) and *livecell_PNN1* (homemade) models
-* * **StarDist** conda environment + *pmls2.zip* (homemade) model
+* **StarDist** conda environment + *pmls2.zip* (homemade) model
 
 ### Version history
 
-Version 1 released on September 22, 2022.
+Version 1 released on November 17, 2022.
 
