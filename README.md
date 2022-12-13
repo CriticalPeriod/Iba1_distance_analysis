@@ -12,24 +12,24 @@
 3D images taken with a x60 objective
 
 4 channels:
-  1. *Alexa Fluor 647:* PV
-  2. *Alexa Fluor 546:* PNN
+  1. *Alexa Fluor 647:* PV cells
+  2. *Alexa Fluor 546:* PNN cells
   3. *EGFP:* Gamma-H2AX
-  4. *Hoechst 33342:* nuclei
+  4. *Hoechst 33342:* DAPI nuclei
 
 ### Plugin description
 
-* Detect nuclei, PV and PNN cells with Cellpose
-
-* Keep Th cells colocalizing with a nucleus only
-* Measure ORF1p intensity in the nucleus and the cytoplasm of each Th cell
-* Measure ORF1p intensity in Th-negative nuclei
-
+* Detect DAPI nuclei, PV and PNN cells with Cellpose
+* Compute their colocalization
+* Keep PV/PNN cells with a nucleus only
+* Detect DAPI and Gamma-H2AX foci in each PV/PNN nucleus with Stardist
 
 ### Dependencies
 
 * **3DImageSuite** Fiji plugin
-* **Cellpose** conda environment + *cyto* and *cyto2* models
+* **CLIJ** Fiji plugin
+* **Cellpose** conda environment + *cyto2*, *cyto_PV1* (homemade) and *livecell_PNN1* (homemade) models
+* * **StarDist** conda environment + *pmls2.zip* (homemade) model
 
 ### Version history
 
