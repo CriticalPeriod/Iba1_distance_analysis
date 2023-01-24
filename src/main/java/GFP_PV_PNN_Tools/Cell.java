@@ -42,7 +42,8 @@ public class Cell {
         params.put("label", label);
     }
     
-    public void setNucParams(double dapiBg, double nucVol, double nucIntTot, double nucIntTotCorr, double gfpBg, double nucGfpIntTot, double nucGfpIntTotCorr) {
+    public void setNucParams(double dapiBg, double nucVol, double nucIntTot, double nucIntTotCorr, double gfpBg, double nucGfpIntTot, 
+            double nucGfpIntTotCorr) {
         params.put("dapiBg", dapiBg);
         params.put("nucVol", nucVol);
         params.put("nucIntTot", nucIntTot);
@@ -72,7 +73,7 @@ public class Cell {
         params.put("pnnBg", pnnBg);
         params.put("pnnCellVol", pnnCellVol);
         params.put("pnnCellIntTot", pnnCellIntTot);
-        params.put("pnnCellIntTotCorr", pnnCellIntTotCorr);   
+        params.put("pnnCellIntTotCorr", pnnCellIntTotCorr); 
     }
     
     public void setDapiFociParams(double dapiFociNb, double dapiFociVolTot, double dapiFociIntTot, double dapiFociIntTotCorr) {

@@ -1,6 +1,7 @@
 import GFP_PV_PNN_Tools.Cell;
 import GFP_PV_PNN_Tools.Tools;
 import ij.*;
+import ij.gui.WaitForUserDialog;
 import ij.plugin.PlugIn;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -66,11 +67,11 @@ public class GFP_PV_PNN implements PlugIn {
             }
             // Write header in results file
             String header = "Image name\tCell label\tDAPI background\tNucleus vol (µm3)\tNucleus total int\tNucleus total int corrected\t" + 
-                    "Gamma-H2AX background\tNucleus total Gamma-H2AX int\tNucleus total Gamma-H2AX int corrected\t" +
-                    "PV background\tPV cell vol (µm3)\tPV cell total int\tPV cell total int corrected\t" +
-                    "PNN background\tPNN cell vol (µm3)\tPNN cell total int\tPNN cell total int corrected\t" +
-                    "Nb Gamma-H2AX foci\tGamma-H2AX foci total vol (µm3)\tGamma-H2AX foci total int\tGamma-H2AX foci total int corrected\t" +
-                    "Nb DAPI foci\tDAPI foci total vol (µm3)\tDAPI foci total int\tDAPI foci total int corrected\n";
+                "Gamma-H2AX background\tNucleus total Gamma-H2AX int\tNucleus total Gamma-H2AX int corrected\t" +
+                "PV background\tPV cell vol (µm3)\tPV cell total int\tPV cell total int corrected\t" +
+                "PNN background\tPNN cell vol (µm3)\tPNN cell total int\tPNN cell total int corrected\t" +
+                "Nb Gamma-H2AX foci\tGamma-H2AX foci total vol (µm3)\tGamma-H2AX foci total int\tGamma-H2AX foci total int corrected\t" +
+                "Nb DAPI foci\tDAPI foci total vol (µm3)\tDAPI foci total int\tDAPI foci total int corrected\n";
             FileWriter fwResults = new FileWriter(outDirResults + "results.xls", false);
             results = new BufferedWriter(fwResults);
             results.write(header);
@@ -135,7 +136,9 @@ public class GFP_PV_PNN implements PlugIn {
                 System.out.println("Finding PNN cells....");
                 Objects3DIntPopulation pnnPop = tools.cellposeDetection(imgPNN, true, tools.cellposePNNModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol);
                 System.out.println(pnnPop.getNbObjects() + " PNN cells found");
-                
+                tools.PNNFilterIntensity(pnnPop, imgPNN);
+                System.out.println(pnnPop.getNbObjects() + " PNN cells found after intensity threshold");
+                new WaitForUserDialog(f).show();
                 // Open GFP channel
                 tools.print("- Analyzing GFP channel -");
                 indexCh = ArrayUtils.indexOf(chsName, channels[2]);
@@ -163,11 +166,12 @@ public class GFP_PV_PNN implements PlugIn {
                 // Write results
                 for (Cell cell : cells) {
                     results.write(rootName+"\t"+cell.params.get("label")+"\t"+cell.params.get("dapiBg")+"\t"+cell.params.get("nucVol")+"\t"+cell.params.get("nucIntTot")+
-                                  "\t"+cell.params.get("nucIntTotCorr")+"\t"+cell.params.get("gfpBg")+"\t"+cell.params.get("nucGfpIntTot")+"\t"+cell.params.get("nucGfpIntTotCorr")+
-                                  "\t"+cell.params.get("pvBg")+"\t"+cell.params.get("pvCellVol")+"\t"+cell.params.get("pvCellIntTot")+"\t"+cell.params.get("pvCellIntTotCorr")+
-                                  "\t"+cell.params.get("pnnBg")+"\t"+cell.params.get("pnnCellVol")+"\t"+cell.params.get("pnnCellIntTot")+"\t"+cell.params.get("pnnCellIntTotCorr")+
-                                  "\t"+cell.params.get("gfpFociNb")+"\t"+cell.params.get("gfpFociVolTot")+"\t"+cell.params.get("gfpFociIntTot")+"\t"+cell.params.get("gfpFociIntTotCorr")+
-                                  "\t"+cell.params.get("dapiFociNb")+"\t"+cell.params.get("dapiFociVolTot")+"\t"+cell.params.get("dapiFociIntTot")+"\t"+cell.params.get("dapiFociIntTotCorr")+"\n");
+                        "\t"+cell.params.get("nucIntTotCorr")+"\t"+cell.params.get("gfpBg")+"\t"+cell.params.get("nucGfpIntTot")+"\t"+cell.params.get("nucGfpIntTotCorr")+
+                        "\t"+cell.params.get("pvBg")+"\t"+cell.params.get("pvCellVol")+"\t"+cell.params.get("pvCellIntTot")+"\t"+cell.params.get("pvCellIntTotCorr")+
+                        "\t"+cell.params.get("pnnBg")+"\t"+cell.params.get("pnnCellVol")+"\t"+cell.params.get("pnnCellIntTot")+"\t"+cell.params.get("pnnCellIntTotCorr")+
+                        "\t"+cell.params.get("gfpFociNb")+"\t"+cell.params.get("gfpFociVolTot")+"\t"+cell.params.get("gfpFociIntTot")+
+                        "\t"+cell.params.get("gfpFociIntTotCorr")+"\t"+cell.params.get("dapiFociNb")+"\t"+cell.params.get("dapiFociVolTot")+"\t"+cell.params.get("dapiFociIntTot")+
+                        "\t"+cell.params.get("dapiFociIntTotCorr")+"\n");
                     results.flush();
                 }
                 
