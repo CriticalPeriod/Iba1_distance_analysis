@@ -8,7 +8,6 @@ import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
-import ij.gui.WaitForUserDialog;
 import ij.io.FileSaver;
 import ij.measure.Calibration;
 import ij.plugin.Duplicator;
@@ -55,7 +54,8 @@ public class Tools {
     private CLIJ2 clij2 = CLIJ2.getInstance();
     
     // Nuclei and cells detection with Cellpose
-    private String cellposeEnvDirPath = "/opt/miniconda3/envs/cellpose";
+    private String cellposeEnvDirPath = IJ.isWindows()? System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose" : "/opt/miniconda3/envs/cellpose";
+    public String cellposeModelPath = IJ.isWindows()? System.getProperty("user.home")+"\\.cellpose\\models\\" : "";
     private boolean useGpu = true;
     public String cellposeNucleiModel = "cyto2";
     public int cellposeNucleiDiameter = 30;
@@ -63,9 +63,9 @@ public class Tools {
     public double cellposeNucleiStitchThresh = 0.75;
     public double minNucleusVol = 100;
     public double maxNucleusVol = 1000;
-            
-    public String cellposePVModel = "cyto_PV1";
-    public String cellposePNNModel = "livecell_PNN1";
+    
+    public String cellposePVModel = cellposeModelPath+"cyto_PV1"; // need to add Cellpose models folder path if own model (for Windows only, not Linux)
+    public String cellposePNNModel = cellposeModelPath+"livecell_PNN1";
     public int cellposeCellThresh = 0;
     public int cellposeCellDiameter = 50;
     public double cellposeCellStitchThresh = 0.25;
@@ -73,7 +73,7 @@ public class Tools {
     public double maxCellVol = 2000;
     public double nucleusPVColocThresh = 0.5;
     public double nucleusPNNColocThresh = 0.25;
-    private  double stdIntTh = 9000;
+    private double stdIntTh = 0;
     
     // Foci detection with StarDist
     private File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
@@ -287,8 +287,6 @@ public class Tools {
         }
         
         gd.addMessage("Nuclei detection", Font.getFont("Monospace"), Color.blue);
-        if (IJ.isWindows())
-            cellposeEnvDirPath = System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose";
         gd.addDirectoryField("Cellpose environment path: ", cellposeEnvDirPath);
         gd.addNumericField("Min nucleus volume (µm3): ", minNucleusVol);
         gd.addNumericField("Max nucleus volume (µm3): ", maxNucleusVol);
@@ -296,7 +294,7 @@ public class Tools {
         gd.addMessage("Cells detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("Min cell volume (µm3): ", minCellVol);
         gd.addNumericField("Max cell volume (µm3): ", maxCellVol);
-        gd.addNumericField("PNN STD intensity threshold : ", stdIntTh);
+        gd.addNumericField("PNN intensity STD threshold: ", stdIntTh);
         
         gd.addMessage("Foci detection", Font.getFont("Monospace"), Color.blue);
         gd.addNumericField("StarDist probability threshold", stardistFociProbThresh);
@@ -329,14 +327,23 @@ public class Tools {
         
         return(chChoices);
     }
-     
+    
+    
+    /**
+     * Flush and close an image
+     */
+    public void flush_close(ImagePlus img) {
+        img.flush();
+        img.close();
+    }
+    
     
     /**
      * Look for all 3D cells in a Z-stack: 
      * - apply CellPose in 2D slice by slice 
      * - let CellPose reconstruct cells in 3D using the stitch threshold parameters
      */
-    public Objects3DIntPopulation cellposeDetection(ImagePlus img, boolean resize, String cellposeModel, int channel, int diameter, double cellProbThresh, double stitchThreshold, boolean removeOutliers, double volMin, double volMax) throws IOException{
+    public Objects3DIntPopulation cellposeDetection(ImagePlus img, boolean resize, String cellposeModel, int channel, int diameter, double cellProbThresh, double stitchThreshold, boolean removeOutliers, double volMin, double volMax, boolean intFilter) throws IOException{
         ImagePlus imgResized;
         if (resize) {
             float resizeFactor = 0.25f;
@@ -358,8 +365,6 @@ public class Tools {
         ImagePlus imgOut = cellpose.run();
         if(resize) imgOut = imgOut.resize(img.getWidth(), img.getHeight(), "none");
         imgOut.setCalibration(cal);
-        //imgOut.show();
-        //new WaitForUserDialog("test").show();
        
         // Get cells as a population of objects and filter them
         ImageHandler imgH = ImageHandler.wrap(imgOut);
@@ -367,6 +372,8 @@ public class Tools {
         Objects3DIntPopulation popExcludeBorders = new Objects3DIntPopulationComputation(pop).getExcludeBorders(ImageHandler.wrap(img), false);
         Objects3DIntPopulation popFilter = new Objects3DIntPopulationComputation​(popExcludeBorders).getFilterSize​(volMin/pixVol, volMax/pixVol);
         Objects3DIntPopulation popFilterZ = zFilterPop(popFilter);
+        if(intFilter)
+            filterCellsByIntensitySTD(popFilterZ, img, stdIntTh);
         popFilterZ.resetLabels();
         System.out.println(popFilterZ.getNbObjects() + " detections remaining after filtering (" + (pop.getNbObjects()-popFilterZ.getNbObjects()) + " filtered out)");
                
@@ -388,26 +395,16 @@ public class Tools {
         return popZ;
     }
     
-    
+   
     /**
-     * Flush and close an image
+     * Remove cells if intensity STD is less than a certain threshold
      */
-    public void flush_close(ImagePlus img) {
-        img.flush();
-        img.close();
-    }
-    
-    /**
-     * Remove cells if STD intensity is less than stdIntTh 
-     * @param pnnPop
-     * @param img 
-     */
-    public void PNNFilterIntensity(Objects3DIntPopulation pnnPop, ImagePlus img) {
+    public void filterCellsByIntensitySTD(Objects3DIntPopulation pop, ImagePlus img, double intStdTh) {
         ImageHandler imh = ImageHandler.wrap(img);
-        pnnPop.getObjects3DInt().removeIf(p -> (new MeasureIntensity(p, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SD) <= stdIntTh));
-        pnnPop.resetLabels();    
+        pop.getObjects3DInt().removeIf(p -> (new MeasureIntensity(p, imh).getValueMeasurement(MeasureIntensity.INTENSITY_SD) <= intStdTh)); 
     }
         
+    
     /**
      * Find cells colocalizing with a nucleus
      */

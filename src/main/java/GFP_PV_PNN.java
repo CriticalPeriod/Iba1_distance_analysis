@@ -1,7 +1,6 @@
 import GFP_PV_PNN_Tools.Cell;
 import GFP_PV_PNN_Tools.Tools;
 import ij.*;
-import ij.gui.WaitForUserDialog;
 import ij.plugin.PlugIn;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -116,7 +115,7 @@ public class GFP_PV_PNN implements PlugIn {
                 ImagePlus imgDAPI = BF.openImagePlus(options)[indexCh];
                 // Detect DAPI nuclei with CellPose
                 System.out.println("Finding DAPI nuclei...");
-                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, true, tools.cellposeNucleiModel, 1, tools.cellposeNucleiDiameter, tools.cellposeNucleiCellThresh, tools.cellposeNucleiStitchThresh, true, tools.minNucleusVol, tools.maxNucleusVol);
+                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, true, tools.cellposeNucleiModel, 1, tools.cellposeNucleiDiameter, tools.cellposeNucleiCellThresh, tools.cellposeNucleiStitchThresh, true, tools.minNucleusVol, tools.maxNucleusVol, false);
                 System.out.println(dapiPop.getNbObjects() + " DAPI nuclei found");
                 
                 // Open PV channel
@@ -125,7 +124,7 @@ public class GFP_PV_PNN implements PlugIn {
                 ImagePlus imgPV = BF.openImagePlus(options)[indexCh];
                 // Detect PV cells with CellPose
                 System.out.println("Finding PV cells....");
-                Objects3DIntPopulation pvPop = tools.cellposeDetection(imgPV, true, tools.cellposePVModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol);
+                Objects3DIntPopulation pvPop = tools.cellposeDetection(imgPV, true, tools.cellposePVModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol, false);
                 System.out.println(pvPop.getNbObjects() + " PV cells found");
                 
                 // Open PNN channel
@@ -134,11 +133,9 @@ public class GFP_PV_PNN implements PlugIn {
                 ImagePlus imgPNN = BF.openImagePlus(options)[indexCh];
                 // Detect PNN cells with CellPose
                 System.out.println("Finding PNN cells....");
-                Objects3DIntPopulation pnnPop = tools.cellposeDetection(imgPNN, true, tools.cellposePNNModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol);
+                Objects3DIntPopulation pnnPop = tools.cellposeDetection(imgPNN, true, tools.cellposePNNModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol, true);
                 System.out.println(pnnPop.getNbObjects() + " PNN cells found");
-                tools.PNNFilterIntensity(pnnPop, imgPNN);
-                System.out.println(pnnPop.getNbObjects() + " PNN cells found after intensity threshold");
-                new WaitForUserDialog(f).show();
+                
                 // Open GFP channel
                 tools.print("- Analyzing GFP channel -");
                 indexCh = ArrayUtils.indexOf(chsName, channels[2]);
