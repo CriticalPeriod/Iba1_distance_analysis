@@ -55,20 +55,20 @@ public class Tools {
     
     // Nuclei and cells detection with Cellpose
     private String cellposeEnvDirPath = IJ.isWindows()? System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose" : "/opt/miniconda3/envs/cellpose";
-    public String cellposeModelPath = IJ.isWindows()? System.getProperty("user.home")+"\\.cellpose\\models\\" : "";
-    private boolean useGpu = true;
-    public String cellposeNucleiModel = "cyto2";
-    public int cellposeNucleiDiameter = 30;
+    public final String cellposeModelPath = IJ.isWindows()? System.getProperty("user.home")+"\\.cellpose\\models\\" : "";
+    private final boolean useGpu = true;
+    public final String cellposeNucleiModel = "cyto2";
+    public final int cellposeNucleiDiameter = 30;
     public int cellposeNucleiCellThresh = 0;
-    public double cellposeNucleiStitchThresh = 0.75;
+    public final double cellposeNucleiStitchThresh = 0.75;
     public double minNucleusVol = 100;
     public double maxNucleusVol = 1000;
     
-    public String cellposePVModel = cellposeModelPath+"cyto_PV1"; // need to add Cellpose models folder path if own model (for Windows only, not Linux)
-    public String cellposePNNModel = cellposeModelPath+"livecell_PNN1";
+    public final String cellposePVModel = cellposeModelPath+"cyto_PV1"; // need to add Cellpose models folder path if own model (for Windows only, not Linux)
+    public final String cellposePNNModel = cellposeModelPath+"livecell_PNN1";
     public int cellposeCellThresh = 0;
     public int cellposeCellDiameter = 50;
-    public double cellposeCellStitchThresh = 0.25;
+    public final double cellposeCellStitchThresh = 0.25;
     public double minCellVol = 100;
     public double maxCellVol = 2000;
     public double nucleusPVColocThresh = 0.5;
@@ -76,15 +76,15 @@ public class Tools {
     private double stdIntTh = 0;
     
     // Foci detection with StarDist
-    private File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
-    private String stardistFociModel = "pmls2.zip";
+    private final File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
+    private final String stardistFociModel = "pmls2.zip";
     private Object syncObject = new Object();
-    private String stardistOutput = "Label Image";
-    private double stardistPercentileBottom = 0.2;
-    private double stardistPercentileTop = 99.8;
-    private double stardistFociProbThresh = 0.50;
-    private double stardistFociOverlayThresh = 0.25;
-    public double minFociVol = 0.1;
+    private final String stardistOutput = "Label Image";
+    private final double stardistPercentileBottom = 0.2;
+    private final double stardistPercentileTop = 99.8;
+    private double stardistFociProbThresh = 0.6;
+    private final double stardistFociOverlayThresh = 0.25;
+    public double minFociVol = 0.05;
     public double maxFociVol = 50;
     
     
@@ -149,6 +149,9 @@ public class Tools {
                    ext = fileExt;
                    break;
                 case "lif"  :
+                    ext = fileExt;
+                    break;
+                case "ics" :
                     ext = fileExt;
                     break;
                 case "ics2" :
@@ -382,6 +385,16 @@ public class Tools {
         return(popFilterZ);
     }
     
+    /**
+     * Remove object with size < min and size > max in microns
+     * @param pop
+     * @param min
+     * @param max
+     */
+    public void popFilterSize(Objects3DIntPopulation pop, double min, double max) {
+        pop.getObjects3DInt().removeIf(p -> (new MeasureVolume(p).getVolumeUnit() < min) || (new MeasureVolume(p).getVolumeUnit() > max));
+        pop.resetLabels();
+    }
     
     /*
      * Remove objects present in only one z slice from population 
@@ -531,6 +544,7 @@ public class Tools {
     */
     public Objects3DIntPopulation stardistFociInCellsPop(ImagePlus img, ArrayList<Cell> cells, String fociType, boolean resize) throws IOException{
         float fociIndex = 1;
+        double resizeFactor = 0.5;
         Objects3DIntPopulation allFociPop = new Objects3DIntPopulation();
         for (Cell cell: cells) {
             Object3DInt nuc = cell.getNucleus();
@@ -544,19 +558,20 @@ public class Tools {
             imgNuc.deleteRoi();
             imgNuc.updateAndDraw();
             
-            // Downscaling and median filter
-            ImagePlus imgS = imgNuc.duplicate();
-            if (resize) imgS  = imgS.resize((int)(0.25*imgNuc.getWidth()), (int)(0.25*imgNuc.getHeight()), 1, "none");
-            ImagePlus imgM = median_filter(imgS, 1, 1);
+            // Median filter, downscaling and gaussian filter
+            ImagePlus imgM = median_filter(imgNuc, 1, 1);
+            ImagePlus imgS = (resize) ? imgM.resize((int)(resizeFactor*imgNuc.getWidth()), (int)(resizeFactor*imgNuc.getHeight()), 1, "average") : imgM.duplicate();
+            flush_close(imgM);
+            ImagePlus imgG = gaussian_filter(imgS,1, 1);
             flush_close(imgS);
 
             // StarDist
             File starDistModelFile = new File(modelsPath+File.separator+stardistFociModel);
             StarDist2D star = new StarDist2D(syncObject, starDistModelFile);
-            star.loadInput(imgM);
+            star.loadInput(imgG);
             star.setParams(stardistPercentileBottom, stardistPercentileTop, stardistFociProbThresh, stardistFociOverlayThresh, stardistOutput);
             star.run();
-            flush_close(imgM);
+            flush_close(imgG);
 
             // Label foci in 3D
             ImagePlus imgLabels = star.associateLabels();
@@ -565,9 +580,7 @@ public class Tools {
             flush_close(imgNuc);
             imgLabels.setCalibration(cal);
             Objects3DIntPopulation fociPop = new Objects3DIntPopulation(ImageHandler.wrap(imgLabels));
-            fociPop = new Objects3DIntPopulationComputation(fociPop).getFilterSize(minFociVol/pixVol, maxFociVol/pixVol);
-            fociPop = zFilterPop(fociPop);
-            fociPop.resetLabels();
+            popFilterSize(fociPop, minFociVol, maxFociVol);
             flush_close(imgLabels);
             
             // Find foci in nucleus
@@ -601,7 +614,24 @@ public class Tools {
        return(imgMed);
     }
     
-   
+    /**
+     * Guassian filter using CLIJ2
+     * @param img
+     * @param sizeXY
+     * @param sizeZ
+     * @return 
+     */ 
+    public ImagePlus gaussian_filter(ImagePlus img, double sizeXY, double sizeZ) {
+       ClearCLBuffer imgCL = clij2.push(img); 
+       ClearCLBuffer imgCLGauss = clij2.create(imgCL);
+       clij2.gaussianBlur3D(imgCL, imgCLGauss, sizeXY, sizeXY, sizeZ);
+       clij2.release(imgCL);
+       ImagePlus imgGauss = clij2.pull(imgCLGauss);
+        clij2.release(imgCLGauss);
+       return(imgGauss);
+    } 
+    
+    
     /**
      * Find dots population colocalizing with a cell objet
      */

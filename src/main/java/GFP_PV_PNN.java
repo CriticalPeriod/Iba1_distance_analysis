@@ -151,7 +151,6 @@ public class GFP_PV_PNN implements PlugIn {
                 // Detect GFP foci in nuclei
                 System.out.println("Finding GFP foci in each nucleus....");
                 Objects3DIntPopulation gfpFociPop = tools.stardistFociInCellsPop(imgGFP, cells, "GFP", true);
-                
                 // Detect DAPI foci in nuclei
                 System.out.println("Finding DAPI foci in each nucleus....");
                 Objects3DIntPopulation dapiFociPop = tools.stardistFociInCellsPop(imgDAPI, cells, "DAPI", true);
