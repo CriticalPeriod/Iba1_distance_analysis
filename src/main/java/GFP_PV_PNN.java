@@ -147,10 +147,13 @@ public class GFP_PV_PNN implements PlugIn {
                 
                 tools.print("- Measuring cells parameters -");
                 tools.writeCellsParameters(cells, imgDAPI, imgPV, imgPNN, imgGFP);
-               
+                tools.flush_close(imgPNN);
+                
                 // Detect GFP foci in nuclei
                 System.out.println("Finding GFP foci in each nucleus....");
                 Objects3DIntPopulation gfpFociPop = tools.stardistFociInCellsPop(imgGFP, cells, "GFP", true);
+                tools.flush_close(imgGFP);
+                
                 // Detect DAPI foci in nuclei
                 System.out.println("Finding DAPI foci in each nucleus....");
                 Objects3DIntPopulation dapiFociPop = tools.stardistFociInCellsPop(imgDAPI, cells, "DAPI", true);
@@ -170,12 +173,10 @@ public class GFP_PV_PNN implements PlugIn {
                         "\t"+cell.params.get("dapiFociIntTotCorr")+"\n");
                     results.flush();
                 }
-                
                 tools.flush_close(imgDAPI);
-                tools.flush_close(imgPNN);
                 tools.flush_close(imgPV);
-                tools.flush_close(imgGFP);
             }
+            results.close();
         } catch (IOException | DependencyException | ServiceException | FormatException | io.scif.DependencyException  ex) {
             Logger.getLogger(GFP_PV_PNN.class.getName()).log(Level.SEVERE, null, ex);
         }

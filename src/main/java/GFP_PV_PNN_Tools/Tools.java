@@ -743,7 +743,7 @@ public class Tools {
         }
        
         ImagePlus[] imgColors2 = {imgObj5.getImagePlus(), imgObj4.getImagePlus(), imgObj3.getImagePlus(), imgDAPI};
-        ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, true);
+        ImagePlus imgObjects2 = new RGBStackMerge().mergeHyperstacks(imgColors2, false);
         imgObjects2.setCalibration(imgDAPI.getCalibration());
         FileSaver ImgObjectsFile2 = new FileSaver(imgObjects2);
         ImgObjectsFile2.saveAsTiff(outDir + imageName + "_foci.tif");
