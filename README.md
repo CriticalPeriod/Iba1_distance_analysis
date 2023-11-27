@@ -1,4 +1,4 @@
-# PV_PNN
+# GFP_PV_PNN
 
 * **Developed for:** David
 * **Team:** Prochiantz
