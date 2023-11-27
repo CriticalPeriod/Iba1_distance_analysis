@@ -1,4 +1,4 @@
-package Cellpose;
+package GFP_PV_PNN_Tools.Cellpose;
 
 
 public class CellposeTaskSettings {

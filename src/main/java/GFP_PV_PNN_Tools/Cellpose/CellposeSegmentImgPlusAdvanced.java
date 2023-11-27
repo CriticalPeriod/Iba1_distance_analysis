@@ -1,7 +1,5 @@
-package Cellpose;
+package GFP_PV_PNN_Tools.Cellpose;
 
-import Cellpose.CellposeTaskSettings;
-import Cellpose.CellposeTask;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;

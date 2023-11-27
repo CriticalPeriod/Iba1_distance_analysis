@@ -1,6 +1,5 @@
-package Cellpose;
+package GFP_PV_PNN_Tools.Cellpose;
 
-import Cellpose.CellposeTaskSettings;
 import java.util.ArrayList;
 
 public class CellposeTask {

@@ -1,9 +1,9 @@
 package GFP_PV_PNN_Tools;
 
 
-import Cellpose.CellposeSegmentImgPlusAdvanced;
-import Cellpose.CellposeTaskSettings;
-import GFP_PV_PNNStardistOrion.StarDist2D;
+import GFP_PV_PNN_Tools.Cellpose.CellposeSegmentImgPlusAdvanced;
+import GFP_PV_PNN_Tools.Cellpose.CellposeTaskSettings;
+import GFP_PV_PNN_Tools.StardistOrion.StarDist2D;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
