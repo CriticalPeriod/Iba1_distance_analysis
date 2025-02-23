@@ -21,6 +21,8 @@ import loci.plugins.BF;
 import loci.plugins.util.ImageProcessorReader;
 import loci.plugins.in.ImporterOptions;
 import mcib3d.geom2.Objects3DIntPopulation;
+import mcib3d.utils.exceptionPrinter;
+
 import org.apache.commons.io.FilenameUtils;
 import org.scijava.util.ArrayUtils;
 
@@ -69,6 +71,7 @@ public class GFP_PV_PNN implements PlugIn {
                 "Gamma-H2AX background\tNucleus total Gamma-H2AX int\tNucleus total Gamma-H2AX int corrected\t" +
                 "PV background\tPV cell vol (µm3)\tPV cell total int\tPV cell total int corrected\t" +
                 "PNN background\tPNN cell vol (µm3)\tPNN cell total int\tPNN cell total int corrected\t" +
+                " Mb cell vol (µm3)\tMb cell total int\t Mb cell total int corrected\t" +
                 "Nb Gamma-H2AX foci\tGamma-H2AX foci total vol (µm3)\tGamma-H2AX foci total int\tGamma-H2AX foci total int corrected\t" +
                 "Nb DAPI foci\tDAPI foci total vol (µm3)\tDAPI foci total int\tDAPI foci total int corrected\n";
             FileWriter fwResults = new FileWriter(outDirResults + "results.xls", false);
@@ -100,7 +103,7 @@ public class GFP_PV_PNN implements PlugIn {
 
             for (String f : imageFiles) {
                 String rootName = FilenameUtils.getBaseName(f);
-                tools.print("--- ANALYZING IMAGE " + rootName + " ------");
+                tools.print("Hello Camille ! --- ANALYZING IMAGE " + rootName + " ------");
                 reader.setId(f);
                 
                 ImporterOptions options = new ImporterOptions();
@@ -111,38 +114,38 @@ public class GFP_PV_PNN implements PlugIn {
                 
                 // Open DAPI channel
                 tools.print("- Analyzing PV channel -");
-                int indexCh = ArrayUtils.indexOf(chsName, channels[3]);
+                int indexCh = ArrayUtils.indexOf(chsName, channels[0]);
                 ImagePlus imgDAPI = BF.openImagePlus(options)[indexCh];
                 // Detect DAPI nuclei with CellPose
                 System.out.println("Finding DAPI nuclei...");
-                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, true, tools.cellposeNucleiModel, 1, tools.cellposeNucleiDiameter, tools.cellposeNucleiCellThresh, tools.cellposeNucleiStitchThresh, true, tools.minNucleusVol, tools.maxNucleusVol, false);
+                Objects3DIntPopulation dapiPop = tools.cellposeDetection(imgDAPI, true, tools.cellposeNucleiModel, 1, tools.cellposeNucleiDiameter, tools.cellposeNucleiCellThresh, tools.cellposeNucleiStitchThresh, true, tools.minNucleusVol, tools.maxNucleusVol, false,  0.4);
                 System.out.println(dapiPop.getNbObjects() + " DAPI nuclei found");
                 
                 // Open PV channel
                 tools.print("- Analyzing PV channel -");
-                indexCh = ArrayUtils.indexOf(chsName, channels[0]);
+                indexCh = ArrayUtils.indexOf(chsName, channels[3]);
                 ImagePlus imgPV = BF.openImagePlus(options)[indexCh];
                 // Detect PV cells with CellPose
                 System.out.println("Finding PV cells....");
-                Objects3DIntPopulation pvPop = tools.cellposeDetection(imgPV, true, tools.cellposePVModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol, false);
+                Objects3DIntPopulation pvPop = tools.cellposeDetection(imgPV, true, tools.cellposePVModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol, false, tools.PVflow_threshold);
                 System.out.println(pvPop.getNbObjects() + " PV cells found");
                 
                 // Open PNN channel
                 tools.print("- Analyzing PNN channel -");
-                indexCh = ArrayUtils.indexOf(chsName, channels[1]);
+                indexCh = ArrayUtils.indexOf(chsName, channels[2]);
                 ImagePlus imgPNN = BF.openImagePlus(options)[indexCh];
                 // Detect PNN cells with CellPose
                 System.out.println("Finding PNN cells....");
-                Objects3DIntPopulation pnnPop = tools.cellposeDetection(imgPNN, true, tools.cellposePNNModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol, true);
+                Objects3DIntPopulation pnnPop = tools.cellposeDetection(imgPNN, true, tools.cellposePNNModel, 1, tools.cellposeCellDiameter, tools.cellposeCellThresh, tools.cellposeCellStitchThresh, false, tools.minCellVol, tools.maxCellVol, true, 0.4);
                 System.out.println(pnnPop.getNbObjects() + " PNN cells found");
                 
                 // Open GFP channel
                 tools.print("- Analyzing GFP channel -");
-                indexCh = ArrayUtils.indexOf(chsName, channels[2]);
+                indexCh = ArrayUtils.indexOf(chsName, channels[1]);
                 ImagePlus imgGFP = BF.openImagePlus(options)[indexCh];
                 
                 System.out.println("Colocalizing nuclei with PV and PNN cells....");
-                ArrayList<Cell> cells = tools.colocalization(dapiPop, pvPop, pnnPop, tools.nucleusPVColocThresh, tools.nucleusPNNColocThresh);
+                ArrayList<Cell> cells = tools.colocalization(dapiPop, pvPop, pnnPop, tools.nucleusPVColocThresh, tools.nucleusPNNColocThresh, tools.expansionType);
                 System.out.println(cells.size() + " nuclei colocalized with a PV and/or a PNN cell");
                 
                 tools.print("- Measuring cells parameters -");
@@ -150,8 +153,8 @@ public class GFP_PV_PNN implements PlugIn {
                 tools.flush_close(imgPNN);
                 
                 // Detect GFP foci in nuclei
-                System.out.println("Finding GFP foci in each nucleus....");
-                Objects3DIntPopulation gfpFociPop = tools.stardistFociInCellsPop(imgGFP, cells, "GFP", true);
+                System.out.println("Finding GFP foci in each membrane....");
+                Objects3DIntPopulation gfpFociPop = tools.stardistFociInMbPop(imgGFP, cells, "GFP", true);
                 tools.flush_close(imgGFP);
                 
                 // Detect DAPI foci in nuclei
@@ -160,6 +163,7 @@ public class GFP_PV_PNN implements PlugIn {
                 
                 // Save image objects
                 tools.print("- Saving results -");
+                // tools.drawResults_wofoci(imgDAPI, imgPV, cells, rootName, outDirResults);
                 tools.drawResults(imgDAPI, imgPV, cells, gfpFociPop, dapiFociPop, rootName, outDirResults);
                 
                 // Write results
@@ -168,6 +172,7 @@ public class GFP_PV_PNN implements PlugIn {
                         "\t"+cell.params.get("nucIntTotCorr")+"\t"+cell.params.get("gfpBg")+"\t"+cell.params.get("nucGfpIntTot")+"\t"+cell.params.get("nucGfpIntTotCorr")+
                         "\t"+cell.params.get("pvBg")+"\t"+cell.params.get("pvCellVol")+"\t"+cell.params.get("pvCellIntTot")+"\t"+cell.params.get("pvCellIntTotCorr")+
                         "\t"+cell.params.get("pnnBg")+"\t"+cell.params.get("pnnCellVol")+"\t"+cell.params.get("pnnCellIntTot")+"\t"+cell.params.get("pnnCellIntTotCorr")+
+                        "\t" + cell.params.get("membraneVol") + "\t" + cell.params.get("membraneIntTot") + "\t" + cell.params.get("membraneIntTotCorr") +
                         "\t"+cell.params.get("gfpFociNb")+"\t"+cell.params.get("gfpFociVolTot")+"\t"+cell.params.get("gfpFociIntTot")+
                         "\t"+cell.params.get("gfpFociIntTotCorr")+"\t"+cell.params.get("dapiFociNb")+"\t"+cell.params.get("dapiFociVolTot")+"\t"+cell.params.get("dapiFociIntTot")+
                         "\t"+cell.params.get("dapiFociIntTotCorr")+"\n");

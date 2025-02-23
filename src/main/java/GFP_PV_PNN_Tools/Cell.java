@@ -14,14 +14,18 @@ public class Cell {
     private Object3DInt pvCell;
     // PNN cell
     private Object3DInt pnnCell; 
+    // Membrane
+    private Object3DInt membrane;
     // Parameters
     public HashMap<String, Double> params;
+
     
 
     public Cell(Object3DInt nucleus) {
         this.nucleus = nucleus;
         this.pvCell = null;
         this.pnnCell = null;
+        this.membrane = null;
         this.params = new HashMap<>();
     }
     
@@ -36,6 +40,10 @@ public class Cell {
     
     public Object3DInt getPnnCell() {
         return pnnCell;
+    }
+
+    public Object3DInt getMembrane() {
+        return membrane;
     }
     
     public void setLabel(double label) {
@@ -88,5 +96,14 @@ public class Cell {
         params.put("gfpFociVolTot", gfpFociVolTot);
         params.put("gfpFociIntTot", gfpFociIntTot);
         params.put("gfpFociIntTotCorr", gfpFociIntTotCorr);
+    }
+
+    public void setMembrane(Object3DInt membrane) {
+        this.membrane = membrane;
+    }
+    public void setMembraneParams(double membraneVol, double membraneIntTot, double membraneIntTotCorr) {
+        params.put("membraneVol", membraneVol);
+        params.put("membraneIntTot", membraneIntTot);
+        params.put("membraneIntTotCorr", membraneIntTotCorr);
     }
 }

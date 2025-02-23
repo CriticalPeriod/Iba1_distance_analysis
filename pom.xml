@@ -96,9 +96,9 @@
                 <type>jar</type>
             </dependency>
 	 <dependency>
-	  <groupId>mcib</groupId>
+	  <groupId>org.framagit.mcib3d</groupId>
 	  <artifactId>mcib3d-core</artifactId>
-	  <version>4.0.93</version>
+	  <version>4.1.7</version>
 	  <type>jar</type>
 	 </dependency>
 	</dependencies>
@@ -149,9 +149,9 @@
                                 <goal>run</goal>
                             </goals>
                             <configuration>
-                                <tasks>
-                                    <copy todir="${imagej.app.directory}/plugins/CIRB" file="target/${project.build.finalName}.jar"/>
-                                </tasks>
+                                <target>
+                                    <copy todir="$~/" file="target/${project.build.finalName}.jar"/>
+                                </target>
                             </configuration>
                         </execution>
                     </executions>
