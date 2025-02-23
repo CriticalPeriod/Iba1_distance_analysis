@@ -1,8 +1,8 @@
-# GFP_PV_PNN
+# VGLUT2 PV PNN 
 
-* **Developed for:** David
+* **Developed for:** Camille
 * **Team:** Prochiantz
-* **Date:** November 2022
+* **Date:** Feb 25
 * **Software:** Fiji
 
 
@@ -14,16 +14,16 @@
 4 channels:
   1. *Alexa Fluor 647:* PV cells
   2. *Alexa Fluor 546:* PNN cells
-  3. *EGFP:* Gamma-H2AX
+  3. *EGFP:* foci protein 
   4. *Hoechst 33342:* nuclei
 
 ### Plugin description
 
 * Detect nuclei, PV and PNN cells with Cellpose
 * Compute their colocalization
-* Keep PV/PNN cells with a nucleus only
-* Detect DAPI and Gamma-H2AX foci in each PV/PNN nucleus with Stardist
-
+* Keep PV or PNN cells with a nucleus only
+* Detect DAPI  PV/PNN nucleus with Stardist
+* Detect GFP foci and intensity in PV/PNN membrane with Stardist
 ### Dependencies
 
 * **3DImageSuite** Fiji plugin
