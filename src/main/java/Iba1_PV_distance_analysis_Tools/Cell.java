@@ -1,4 +1,4 @@
-package GFP_PV_PNN_Tools;
+package Iba1_PV_distance_analysis_Tools;
 
 import java.util.HashMap;
 import mcib3d.geom2.Object3DInt;
@@ -105,5 +105,10 @@ public class Cell {
         params.put("membraneVol", membraneVol);
         params.put("membraneIntTot", membraneIntTot);
         params.put("membraneIntTotCorr", membraneIntTotCorr);
+    }
+    public void setCentroidCoordinates(double x, double y, double z) {
+        params.put("centroidX", x);
+        params.put("centroidY", y);
+        params.put("centroidZ", z);
     }
 }

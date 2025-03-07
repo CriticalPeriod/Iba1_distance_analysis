@@ -7,10 +7,10 @@
 
         
 	<groupId>cirb</groupId>
-	<artifactId>GFP_PV_PNN</artifactId>
+	<artifactId>Iba1_PV_distance_analysis</artifactId>
 	<version>1.0.0</version>
         <packaging>jar</packaging>
-	<name>GFP_PV_PNN</name>
+	<name>Iba1_PV_distance_analysis</name>
 	<description>
             find Th in ucleus and in processses,
         </description>
@@ -33,7 +33,7 @@
 	<properties>
                 <imagej.app.directory>/opt/Fiji.app/</imagej.app.directory>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<main-class>GFP_PV_PNN.jar</main-class>
+		<main-class>Iba1_PV_distance_analysis.jar</main-class>
 	</properties>
 
 	<dependencies>

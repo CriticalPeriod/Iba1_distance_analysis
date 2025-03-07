@@ -1,9 +1,9 @@
-package GFP_PV_PNN_Tools;
+package Iba1_PV_distance_analysis_Tools;
 
 
-import GFP_PV_PNN_Tools.Cellpose.CellposeSegmentImgPlusAdvanced;
-import GFP_PV_PNN_Tools.Cellpose.CellposeTaskSettings;
-import GFP_PV_PNN_Tools.StardistOrion.StarDist2D;
+import Iba1_PV_distance_analysis_Tools.Cellpose.CellposeSegmentImgPlusAdvanced;
+import Iba1_PV_distance_analysis_Tools.Cellpose.CellposeTaskSettings;
+import Iba1_PV_distance_analysis_Tools.StardistOrion.StarDist2D;
 import fiji.util.gui.GenericDialogPlus;
 import ij.IJ;
 import ij.ImagePlus;
@@ -17,6 +17,7 @@ import ij.process.ImageProcessor;
 import io.scif.DependencyException;
 import java.awt.Color;
 import java.awt.Font;
+// import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -24,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import javax.swing.ImageIcon;
 import loci.common.services.ServiceException;
 import loci.formats.FormatException;
 import loci.formats.meta.IMetadata;
@@ -45,13 +45,13 @@ import org.apache.commons.io.FilenameUtils;
 import org.scijava.util.ArrayUtils;
 
 
+
 /**
  * @author Orion-CIRB
  */
 public class Tools {
-    private final ImageIcon icon = new ImageIcon(this.getClass().getResource("/Orion_icon.png"));
     
-    public String[] channelNames = {"DAPI","Gamma-H2AX","PNN", "PV"};
+    public String[] channelNames = {"DAPI","Gamma-H2AX","Iba1", "PV"};
     public Calibration cal;
     public double pixVol= 0;
     
@@ -59,40 +59,42 @@ public class Tools {
     
     // Nuclei and cells detection with Cellpose
     private String cellposeEnvDirPath = IJ.isWindows()? System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose" : "/opt/anaconda3/envs/vglut/";
-    public final String cellposeModelPath = IJ.isWindows()? System.getProperty("user.home")+"\\.cellpose\\\\" : "/opt/anaconda3/envs/vglut/models/";
+    public final String cellposeModelPath = IJ.isWindows()? System.getProperty("user.home")+"\\miniconda3\\envs\\CellPose\\models\\" : "/opt/anaconda3/envs/vglut/models/";
     private final boolean useGpu = true;
     public final String cellposeNucleiModel = "cyto2";
     public final int cellposeNucleiDiameter = 30;
     public int cellposeNucleiCellThresh = 0;
-    public final double cellposeNucleiStitchThresh = 0.75;
-    public double minNucleusVol = 100;
-    public double maxNucleusVol = 1000;
+    public final double cellposeNucleiStitchThresh = 0.50;
+    public double minNucleusVol = 40;
+    public double maxNucleusVol = 2500;
     
     public final String cellposePVModel = cellposeModelPath+"cyto_PV1"; // need to add Cellpose models folder path if own model (for Windows only, not Linux)
-    public final String cellposePNNModel = cellposeModelPath+"livecell_PNN1";
-    public double cellposeCellThresh = -2;
-    public int cellposeCellDiameter = 50;
-    public double PVflow_threshold = 0.4;
-    public final double cellposeCellStitchThresh = 0.25;
-    public double minCellVol = 100;
-    public double maxCellVol = 2000;
-    public double nucleusPVColocThresh = 0.5;
-    public double nucleusPNNColocThresh = 0.25;
+    public final String cellposePNNModel = cellposeModelPath+"cyto2_Iba1_microglia";
+    public double cellposeCellThresh = -3;
+    public int cellposeIba1CellDiameter = 30;
+    public int cellposePVCellDiameter = 40;
+    public double PVflow_threshold = 0.6;
+    public final double cellposeCellStitchThresh = 0.20;
+    public double minCellVol = 40;
+    public double maxCellVol = 5500;
+    public double nucleusPVColocThresh = 0.2;
+    public double nucleusPNNColocThresh = 0.15;
     private double stdIntTh = 0;
     public double expansionFactor = 0.4;
     public int expansionType = 0;
     
     // Foci detection with StarDist
+    public boolean detectFoci = false; // Default value is false
     private final File modelsPath = new File(IJ.getDirectory("imagej")+File.separator+"models");
-    private final String stardistFociModel = "pmls2.zip";
+    private final String stardistFociModel = "fociRNA-1.2.zip";
     private Object syncObject = new Object();
     private final String stardistOutput = "Label Image";
     private final double stardistPercentileBottom = 0.2;
     private final double stardistPercentileTop = 99.8;
-    private double stardistFociProbThresh = 0.6;
-    private final double stardistFociOverlayThresh = 0.25;
+    private double stardistFociProbThresh = 0.3;
+    private final double stardistFociOverlayThresh = 0.15;
     public double minFociVol = 0.05;
-    public double maxFociVol = 50;
+    public double maxFociVol = 15;
     
     
     /**
@@ -279,8 +281,6 @@ public class Tools {
         return(channels.toArray(new String[channels.size()]));         
     }
     
-    
-    
     /**
      * Generate dialog box
      */
@@ -303,15 +303,16 @@ public class Tools {
         gd.addNumericField("Min cell volume (µm3): ", minCellVol);
         gd.addNumericField("Max cell volume (µm3): ", maxCellVol);
         gd.addNumericField("PNN intensity STD threshold: ", stdIntTh);
-        gd.addNumericField("PV intensity threshold: (-6 to 6) ", cellposeCellThresh);
+        gd.addNumericField("PV prob threshold: (-6 to 6) ", cellposeCellThresh);
         gd.addNumericField("PV intensity flow: ) ", PVflow_threshold);
-        gd.addNumericField("Expansion Factor for nuclei: ) ", expansionFactor);
+        gd.addNumericField("Expansion Factor : ) ", expansionFactor);
         gd.addMessage("Expansion Type", Font.getFont("Monospace"), Color.blue);
         String[] expansionTypes = {"Nucleus", "PV", "PNN"};
         gd.addChoice("Expansion Type: ", expansionTypes, expansionTypes[0]);
         
         
         gd.addMessage("Foci detection", Font.getFont("Monospace"), Color.blue);
+        gd.addCheckbox("Detect foci: ", detectFoci);
         gd.addNumericField("StarDist probability threshold", stardistFociProbThresh);
         gd.addNumericField("Min foci volume (µm3): ", minFociVol);
         gd.addNumericField("Max foci volume (µm3): ", maxFociVol);
@@ -337,6 +338,7 @@ public class Tools {
         PVflow_threshold = gd.getNextNumber();
         expansionFactor = gd.getNextNumber();
         expansionType = gd.getNextChoiceIndex();
+        detectFoci = gd.getNextBoolean();
         stardistFociProbThresh = gd.getNextNumber();
         minFociVol = gd.getNextNumber();
         maxFociVol = gd.getNextNumber();
@@ -486,8 +488,9 @@ public class Tools {
                     }
     
                     if (expansionObject != null) {
-                        Object3DInt membrane = extendObject(expansionObject, expansionFactor);
+                        Object3DInt membrane = extendObject_c(expansionObject, expansionFactor);
                         cell.setMembrane(membrane);
+
                     }
     
                     cell.setLabel(label);
@@ -499,51 +502,125 @@ public class Tools {
         }
         return(cells);
     }
-    private Object3DInt extendObject(Object3DInt object, double expansionFactor) {
-        // Calculate the centroid of the object
-        double[] centroid = calculateCentroid(object);
-    
-        // Create a new Object3DInt for the expanded object
-        Object3DInt expandedObject = new Object3DInt();
-    
-        // Get the bounding box of the object to determine the z-range
+    private Object3DInt extendObject_c(Object3DInt object, double expansionFactor) {
+        // Create a new Object3DInt for the expanded object (the shell)
+        Object3DInt shellObject = new Object3DInt();
+        
+        // Get the bounding box of the object
         BoundingBox boundingBox = object.getBoundingBox();
+        int xMin = boundingBox.xmin;
+        int xMax = boundingBox.xmax;
+        int yMin = boundingBox.ymin;
+        int yMax = boundingBox.ymax;
         int zMin = boundingBox.zmin;
         int zMax = boundingBox.zmax;
-    
+        
+        // Calculate the expansion distance in voxels (using the max dimension as reference)
+        int xSize = xMax - xMin;
+        int ySize = yMax - yMin;
+        int zSize = zMax - zMin;
+        int maxSize = Math.max(Math.max(xSize, ySize), zSize);
+        int expansionDistance = (int)Math.ceil(maxSize * expansionFactor / 2);
+        
+        // Extend the bounding box for the dilation
+        xMin -= expansionDistance;
+        xMax += expansionDistance;
+        yMin -= expansionDistance;
+        yMax += expansionDistance;
+        zMin -= expansionDistance;
+        zMax += expansionDistance;
+        
         // Create a set to store the original object voxels for quick lookup
-        Set<VoxelInt> originalVoxels = new HashSet<>();
-        for (Object3DPlane plane : object.getObject3DPlanes()) {
-            originalVoxels.addAll(plane.getVoxels());
-        }
-    
-        // Iterate through the planes and their voxels
+        Set<String> originalVoxelKeys = new HashSet<>();
         for (Object3DPlane plane : object.getObject3DPlanes()) {
             for (VoxelInt voxel : plane.getVoxels()) {
-                int x = voxel.getX();
-                int y = voxel.getY();
-                int z = voxel.getZ();
-    
-                // Calculate the new coordinates based on the expansion factor
-                int newX = (int) Math.round(centroid[0] + (x - centroid[0]) * (1 + expansionFactor));
-                int newY = (int) Math.round(centroid[1] + (y - centroid[1]) * (1 + expansionFactor));
-                int newZ = (int) Math.round(centroid[2] + (z - centroid[2]) * (1 + expansionFactor));
-    
-                // Ensure the new z-coordinate is within the original z-range
-                newZ = Math.max(zMin, Math.min(zMax, newZ));
-    
-                // Create the new voxel
-                VoxelInt newVoxel = new VoxelInt(newX, newY, newZ, voxel.getValue());
-    
-                // Add the expanded voxel to the new object if it's not part of the original object
-                if (!originalVoxels.contains(newVoxel)) {
-                    expandedObject.addVoxel(newVoxel);
+                originalVoxelKeys.add(voxel.getX() + "_" + voxel.getY() + "_" + voxel.getZ());
+            }
+        }
+        
+        // Calculate the center of the object
+        double[] centroid = calculateCentroid(object);
+        
+        // For each voxel in the extended bounding box, check if it should be part of the shell
+        for (int z = zMin; z <= zMax; z++) {
+            for (int y = yMin; y <= yMax; y++) {
+                for (int x = xMin; x <= xMax; x++) {
+                    // Calculate distance from centroid to current point
+                    double dx = x - centroid[0];
+                    double dy = y - centroid[1];
+                    double dz = z - centroid[2];
+                    // double distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    // Calculate distance from centroid to current point in original object scale
+                    // double originalDistance = distance / (1 + expansionFactor);
+                    
+                    // Calculate the coordinates this would map to in the original object
+                    int origX = (int)Math.round(centroid[0] + dx * (1 / (1 + expansionFactor)));
+                    int origY = (int)Math.round(centroid[1] + dy * (1 / (1 + expansionFactor)));
+                    int origZ = (int)Math.round(centroid[2] + dz * (1 / (1 + expansionFactor)));
+                    
+                    String newKey = x + "_" + y + "_" + z;
+                    String origKey = origX + "_" + origY + "_" + origZ;
+                    
+                    // If this point maps to the original object but is not in the original object,
+                    // then it's part of the shell
+                    if (originalVoxelKeys.contains(origKey) && !originalVoxelKeys.contains(newKey)) {
+                        shellObject.addVoxel(new VoxelInt(x, y, z, object.getLabel()));
+                    }
                 }
             }
         }
-    
-        return expandedObject;
+        shellObject.setVoxelSizeXY(cal.pixelWidth);
+        shellObject.setVoxelSizeZ(cal.pixelDepth);
+        
+        return shellObject;
     }
+    // Old version of the extension. Contains a mistake, fixed in the above version. 
+    // private Object3DInt extendObject(Object3DInt object, double expansionFactor) {
+    //     // Calculate the centroid of the object
+    //     double[] centroid = calculateCentroid(object);
+    
+    //     // Create a new Object3DInt for the expanded object
+    //     Object3DInt expandedObject = new Object3DInt();
+    
+    //     // Get the bounding box of the object to determine the z-range
+    //     BoundingBox boundingBox = object.getBoundingBox();
+    //     int zMin = boundingBox.zmin;
+    //     int zMax = boundingBox.zmax;
+    
+    //     // Create a set to store the original object voxels for quick lookup
+    //     Set<VoxelInt> originalVoxels = new HashSet<>();
+    //     for (Object3DPlane plane : object.getObject3DPlanes()) {
+    //         originalVoxels.addAll(plane.getVoxels());
+    //     }
+    
+    //     // Iterate through the planes and their voxels
+    //     for (Object3DPlane plane : object.getObject3DPlanes()) {
+    //         for (VoxelInt voxel : plane.getVoxels()) {
+    //             int x = voxel.getX();
+    //             int y = voxel.getY();
+    //             int z = voxel.getZ();
+    
+    //             // Calculate the new coordinates based on the expansion factor
+    //             int newX = (int) Math.round(centroid[0] + (x - centroid[0]) * (1 + expansionFactor));
+    //             int newY = (int) Math.round(centroid[1] + (y - centroid[1]) * (1 + expansionFactor));
+    //             int newZ = (int) Math.round(centroid[2] + (z - centroid[2]) * (1 + expansionFactor));
+    
+    //             // Ensure the new z-coordinate is within the original z-range
+    //             newZ = Math.max(zMin, Math.min(zMax, newZ));
+    
+    //             // Create the new voxel
+    //             VoxelInt newVoxel = new VoxelInt(newX, newY, newZ, voxel.getValue());
+    
+    //             // Add the expanded voxel to the new object if it's not part of the original object
+    //             if (!originalVoxels.contains(newVoxel)) {
+    //                 expandedObject.addVoxel(newVoxel);
+    //             }
+    //         }
+    //     }
+    
+    //     return expandedObject;
+    // }
         
     private double[] calculateCentroid(Object3DInt object) {
         double sumX = 0;
@@ -605,13 +682,13 @@ public class Tools {
                 cell.setPnnParams(pnnBg, null, null, null);
             }
             // Membrane
-        Object3DInt membrane = cell.getMembrane();
-        if(membrane != null) {
-            membrane.setLabel(label);
-            double membraneVol = new MeasureVolume(membrane).getVolumeUnit();
-            double membraneIntTot = new MeasureIntensity(membrane, ImageHandler.wrap(imgGFP)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
-            cell.setMembraneParams(membraneVol, membraneIntTot, membraneIntTot-gfpBg*membraneVol);
-        }
+            Object3DInt membrane = cell.getMembrane();
+            if(membrane != null) {
+                membrane.setLabel(label);
+                double membraneVol = new MeasureVolume(membrane).getVolumeUnit();
+                double membraneIntTot = new MeasureIntensity(membrane, ImageHandler.wrap(imgGFP)).getValueMeasurement(MeasureIntensity.INTENSITY_SUM);
+                cell.setMembraneParams(membraneVol, membraneIntTot, membraneIntTot-gfpBg*membraneVol);
+            }
         }
     }
     
@@ -751,7 +828,7 @@ public class Tools {
             MeasurePopulationColocalisation coloc = new MeasurePopulationColocalisation(cellPop, dotsPop);
             for (Object3DInt dot: dotsPop.getObjects3DInt()) {
                     double colocVal = coloc.getValueObjectsPair(cellObj, dot);
-                    if (colocVal > 0.75*dot.size()) {
+                    if (colocVal > 0.5*dot.size()) {
                         colocPop.addObject(dot);
                     }
             }
@@ -911,64 +988,66 @@ public class Tools {
     imgObj5.closeImagePlus();
     imgObj6.closeImagePlus();
 }
-public Objects3DIntPopulation stardistFociInMbPop(ImagePlus img, ArrayList<Cell> cells, String fociType, boolean resize) throws IOException{
-    float fociIndex = 1;
-    double resizeFactor = 0.5;
-    Objects3DIntPopulation allFociPop = new Objects3DIntPopulation();
-    for (Cell cell: cells) {
-        Object3DInt mb = cell.getMembrane();
-        if (mb == null) {
-            continue; // Skip cells without a membrane
-        }
-        
-        // Crop image around nucleus
-        BoundingBox box = mb.getBoundingBox();
-        Roi roiBox = new Roi(box.xmin, box.ymin, box.xmax-box.xmin, box.ymax-box.ymin);
-        img.setRoi(roiBox);
-        img.updateAndDraw();
-        ImagePlus imgNuc = new Duplicator().run(img, box.zmin+1, box.zmax+1);
-        imgNuc.deleteRoi();
-        imgNuc.updateAndDraw();
-        
-        // Median filter, downscaling and gaussian filter
-        ImagePlus imgM = median_filter(imgNuc, 1, 1);
-        ImagePlus imgS = (resize) ? imgM.resize((int)(resizeFactor*imgNuc.getWidth()), (int)(resizeFactor*imgNuc.getHeight()), 1, "average") : imgM.duplicate();
-        flush_close(imgM);
-        ImagePlus imgG = gaussian_filter(imgS,1, 1);
-        flush_close(imgS);
 
-        // StarDist
-        File starDistModelFile = new File(modelsPath+File.separator+stardistFociModel);
-        StarDist2D star = new StarDist2D(syncObject, starDistModelFile);
-        star.loadInput(imgG);
-        star.setParams(stardistPercentileBottom, stardistPercentileTop, stardistFociProbThresh, stardistFociOverlayThresh, stardistOutput);
-        star.run();
-        flush_close(imgG);
+    public Objects3DIntPopulation stardistFociInMbPop(ImagePlus img, ArrayList<Cell> cells, String fociType, boolean resize) throws IOException{
+        float fociIndex = 1;
+        double resizeFactor = 0.5;
+        Objects3DIntPopulation allFociPop = new Objects3DIntPopulation();
+        for (Cell cell: cells) {
+            Object3DInt mb = cell.getMembrane();
+            if (mb == null) {
+                continue; // Skip cells without a membrane
+            }
+            
+            // Crop image around nucleus
+            BoundingBox box = mb.getBoundingBox();
+            Roi roiBox = new Roi(box.xmin, box.ymin, box.xmax-box.xmin, box.ymax-box.ymin);
+            img.setRoi(roiBox);
+            img.updateAndDraw();
+            ImagePlus imgNuc = new Duplicator().run(img, box.zmin+1, box.zmax+1);
+            imgNuc.deleteRoi();
+            imgNuc.updateAndDraw();
+            
+            // Median filter, downscaling and gaussian filter
+            ImagePlus imgM = median_filter(imgNuc, 1, 1);
+            ImagePlus imgS = (resize) ? imgM.resize((int)(resizeFactor*imgNuc.getWidth()), (int)(resizeFactor*imgNuc.getHeight()), 1, "average") : imgM.duplicate();
+            flush_close(imgM);
+            ImagePlus imgG = gaussian_filter(imgS,1, 1);
+            flush_close(imgS);
 
-        // Label foci in 3D
-        ImagePlus imgLabels = star.associateLabels();
-        if (resize) imgLabels = imgLabels.resize(imgNuc.getWidth(), imgNuc.getHeight(), 1, "none");
-        
-        flush_close(imgNuc);
-        imgLabels.setCalibration(cal);
-        Objects3DIntPopulation fociPop = new Objects3DIntPopulation(ImageHandler.wrap(imgLabels));
-        popFilterSize(fociPop, minFociVol, maxFociVol);
-        flush_close(imgLabels);
-        
-        // Find foci in nucleus
-        fociPop.translateObjects(box.xmin, box.ymin, box.zmin);
-        Objects3DIntPopulation fociColocPop = findFociInCell(mb, fociPop);
-        System.out.println(fociColocPop.getNbObjects() + " " + fociType + " foci found in membrane " + mb.getLabel());
-        
-        for (Object3DInt foci: fociColocPop.getObjects3DInt()) {
-            foci.setLabel(fociIndex);
-            fociIndex++;
-            foci.setType(cell.params.get("label").intValue());
-            allFociPop.addObject(foci);
+            // StarDist
+            File starDistModelFile = new File(modelsPath+File.separator+stardistFociModel);
+            StarDist2D star = new StarDist2D(syncObject, starDistModelFile);
+            System.out.println(starDistModelFile +"path for stardist in membrane ");
+            star.loadInput(imgG);
+            star.setParams(stardistPercentileBottom, stardistPercentileTop, stardistFociProbThresh, stardistFociOverlayThresh, stardistOutput);
+            star.run();
+            flush_close(imgG);
+
+            // Label foci in 3D
+            ImagePlus imgLabels = star.associateLabels();
+            if (resize) imgLabels = imgLabels.resize(imgNuc.getWidth(), imgNuc.getHeight(), 1, "none");
+            
+            flush_close(imgNuc);
+            imgLabels.setCalibration(cal);
+            Objects3DIntPopulation fociPop = new Objects3DIntPopulation(ImageHandler.wrap(imgLabels));
+            popFilterSize(fociPop, minFociVol, maxFociVol);
+            flush_close(imgLabels);
+            
+            // Find foci in nucleus
+            fociPop.translateObjects(box.xmin, box.ymin, box.zmin);
+            Objects3DIntPopulation fociColocPop = findFociInCell(mb, fociPop);
+            System.out.println(fociColocPop.getNbObjects() + " " + fociType + " foci found in membrane " + mb.getLabel());
+            
+            for (Object3DInt foci: fociColocPop.getObjects3DInt()) {
+                foci.setLabel(fociIndex);
+                fociIndex++;
+                foci.setType(cell.params.get("label").intValue());
+                allFociPop.addObject(foci);
+            }
+            
+            writeFociParameters(cell, fociColocPop, img, fociType);
         }
-        
-        writeFociParameters(cell, fociColocPop, img, fociType);
+        return(allFociPop);
     }
-    return(allFociPop);
-}
 } 
